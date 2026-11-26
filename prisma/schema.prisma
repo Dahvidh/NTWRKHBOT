@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  platform       String          // "whatsapp" | "telegram"
+  platformUserId String
+  displayName    String          @default("Creator")
+  niches         String[]        @default([])
+  plan           String          @default("free") // "free" | "pro"
+  postsCount     Int             @default(0)
+  totalReach     Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  socialAccounts SocialAccount[]
+  posts          Post[]
+  payments       Payment[]
+
+  @@unique([platform, platformUserId])
+  @@index([niches], type: Gin)
+}
+
+model SocialAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       String    // "instagram" | "tiktok"
+  providerUserId String
+  username       String?
+  accessToken    String
+  refreshToken   String?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, provider])
+}
+
+model Post {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caption          String
+  mediaUrl         String?
+  mediaType        String   @default("text") // "video" | "image" | "text"
+  originalTags     String[] @default([])
+  expandedTags     String[] @default([])
+  matchedUsers     Int      @default(0)
+  publishedTargets String[] @default([])
+  createdAt        DateTime @default(now())
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reference String   @unique
+  amount    Int
+  currency  String   @default("NGN")
+  status    String   @default("pending") // "pending" | "success"
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ntwrkh_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ntwrkh
+      POSTGRES_PASSWORD: ntwrkh_secret_password
+      POSTGRES_DB: ntwrkh_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ntwrkh -d ntwrkh_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ntwrkh_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: ntwrkh_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://ntwrkh:ntwrkh_secret_password@postgres:5432/ntwrkh_db?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma db push && npm start"
+
+  worker:
+    build: .
+    container_name: ntwrkh_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://ntwrkh:ntwrkh_secret_password@postgres:5432/ntwrkh_db?schema=public
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run worker
+
+volumes:
+  postgres_data:
+  redis_data:
